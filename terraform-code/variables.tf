@@ -23,11 +23,15 @@ variable "github_repo_name" {
 variable "github_branch" {
   description = "The branch to use for the GitHub repository"
   type        = string
- # You can specify your default branch or leave it empty to make it a required input
+  # You can specify your default branch or leave it empty to make it a required input
 }
 
 variable "github_repo_url" {
   description = "HTTPS URL of the GitHub repository"
   type        = string
 }
-
+variable "github_token" {
+  description = "GitHub OAuth token"
+  type        = string
+  sensitive   = true
+}

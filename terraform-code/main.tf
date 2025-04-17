@@ -1,8 +1,16 @@
 # Root main.tf for full EKS + VPC + CodePipeline Infrastructure
 
-provider "aws" {
-  region = var.aws_region
+terraform {
+  required_version = ">= 1.1.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
 }
+
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
@@ -19,21 +27,21 @@ module "vpc" {
   single_nat_gateway = true
 
   tags = {
-    Terraform = "true"
+    Terraform   = "true"
     Environment = "dev"
   }
 }
 
 module "eks" {
-  source          = "terraform-aws-modules/eks/aws"
-  version         = "20.8.4"
+  source  = "terraform-aws-modules/eks/aws"
+  version = "20.8.4"
 
   cluster_name    = var.cluster_name
   cluster_version = "1.27"
 
-  subnet_ids         = module.vpc.private_subnets
-  vpc_id             = module.vpc.vpc_id
-  enable_irsa        = true
+  subnet_ids                               = module.vpc.private_subnets
+  vpc_id                                   = module.vpc.vpc_id
+  enable_irsa                              = true
   enable_cluster_creator_admin_permissions = true
 
   eks_managed_node_groups = {
@@ -54,7 +62,7 @@ module "eks" {
 }
 
 resource "aws_s3_bucket" "artifacts" {
-  bucket = "eks-sockshop-artifacts-${random_string.suffix.result}"
+  bucket        = "eks-sockshop-artifacts-${random_string.suffix.result}"
   force_destroy = true
 }
 
@@ -86,13 +94,13 @@ resource "aws_iam_role_policy_attachment" "codebuild_policy" {
 }
 
 resource "aws_codebuild_project" "deploy" {
-  name          = "sockshop-deploy"
-  service_role  = aws_iam_role.codebuild_role.arn
+  name         = "sockshop-deploy"
+  service_role = aws_iam_role.codebuild_role.arn
 
   source {
     type      = "GITHUB"
     location  = var.github_repo_url
-    buildspec = "pipeline/buildspec-deploy.yml"
+    buildspec = "terraform-code/pipeline/buildspec-deploy.yml"
   }
 
   artifacts {
@@ -100,37 +108,39 @@ resource "aws_codebuild_project" "deploy" {
   }
 
   environment {
-    compute_type      = "BUILD_GENERAL1_SMALL"
-    image             = "aws/codebuild/standard:7.0"
-    type              = "LINUX_CONTAINER"
-    privileged_mode   = true
-    environment_variables = [
-      {
-        name  = "AWS_REGION"
-        value = var.aws_region
-      },
-      {
-        name  = "EKS_CLUSTER_NAME"
-        value = var.cluster_name
-      }
-    ]
+    compute_type    = "BUILD_GENERAL1_SMALL"
+    image           = "aws/codebuild/standard:7.0"
+    type            = "LINUX_CONTAINER"
+    privileged_mode = true
+
+    environment_variable {
+      name  = "AWS_REGION"
+      value = var.aws_region
+    }
+
+    environment_variable {
+      name  = "EKS_CLUSTER_NAME"
+      value = var.cluster_name
+    }
   }
+
 }
 
-
+# Define the assume role policy for CodePipeline
+data "aws_iam_policy_document" "codepipeline_assume_role_policy" {
+  statement {
+    actions = [
+      "sts:AssumeRole"
+    ]
+    principals {
+      type        = "Service"
+      identifiers = ["codepipeline.amazonaws.com"]
+    }
+  }
+}
 resource "aws_iam_role" "pipeline_role" {
-  name = "codepipeline-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Service = "codepipeline.amazonaws.com"
-      }
-      Action = "sts:AssumeRole"
-    }]
-  })
+  name = "codepipeline-role-new"
+  assume_role_policy = data.aws_iam_policy_document.codepipeline_assume_role_policy.json
 }
 
 resource "aws_iam_role_policy_attachment" "pipeline_policy" {
@@ -149,7 +159,7 @@ resource "aws_codepipeline" "pipeline" {
 
   stage {
     name = "Source"
-    
+
     action {
       name             = "Source"
       category         = "Source"
@@ -162,21 +172,24 @@ resource "aws_codepipeline" "pipeline" {
         Owner      = var.github_owner
         Repo       = var.github_repo_name
         Branch     = var.github_branch
+        OAuthToken = var.github_token
       }
     }
   }
 
+
   stage {
     name = "Deploy"
-    
+
     action {
       name             = "DeployAction"
-      category         = "Build"
+      category         = "Build" # You're using CodeBuild
       owner            = "AWS"
-      provider         = "CodeBuild"
-      input_artifacts  = ["source_output"]
+      provider         = "CodeBuild"       # Must be CodeBuild if using CodeBuild project
+      input_artifacts  = ["source_output"] # Comes from previous stage
       output_artifacts = ["deploy_output"]
       run_order        = 1
+      version          = "1"
 
       configuration = {
         ProjectName = aws_codebuild_project.deploy.name
