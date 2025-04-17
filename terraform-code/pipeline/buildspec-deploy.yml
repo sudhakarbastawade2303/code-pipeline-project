@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   variables:
-    GITHUB_REPO_URL: https://github.com/microservices-demo/microservices-demo.git
+    GITHUB_REPO_URL: https://github.com/sudhakarbastawade2303/code-pipeline-project.git
     GITHUB_BRANCH: master
 
 phases:
@@ -23,12 +23,12 @@ phases:
     - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
     - echo "Cloning public repo: $GITHUB_REPO_URL"
     - git clone -b $GITHUB_BRANCH $GITHUB_REPO_URL
-    - cd microservices-demo
+    - cd terraform-code
 
   build:
     commands:
     - echo "Deploying Sock Shop microservices"
-    - kubectl apply -f deploy/kubernetes/complete-demo.yaml
+    - kubectl apply -f complete-deploy.yml
     - echo "Waiting for front-end rollout..."
     - kubectl rollout status deployment/front-end -n sock-shop --timeout=180s
 
