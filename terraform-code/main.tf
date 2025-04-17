@@ -89,21 +89,21 @@ resource "aws_codebuild_project" "deploy" {
   name          = "sockshop-deploy"
   service_role  = aws_iam_role.codebuild_role.arn
 
-    source {
-    type            = "CODEPIPELINE"
-    buildspec       = "pipeline/buildspec-deploy.yml"
-    }
-
+  source {
+    type      = "GITHUB"
+    location  = var.github_repo_url
+    buildspec = "pipeline/buildspec-deploy.yml"
+  }
 
   artifacts {
     type = "NO_ARTIFACTS"
   }
 
   environment {
-    compute_type                = "BUILD_GENERAL1_SMALL"
-    image                       = "aws/codebuild/standard:7.0"
-    type                        = "LINUX_CONTAINER"
-    privileged_mode             = true
+    compute_type      = "BUILD_GENERAL1_SMALL"
+    image             = "aws/codebuild/standard:7.0"
+    type              = "LINUX_CONTAINER"
+    privileged_mode   = true
     environment_variables = [
       {
         name  = "AWS_REGION"
@@ -116,6 +116,7 @@ resource "aws_codebuild_project" "deploy" {
     ]
   }
 }
+
 
 resource "aws_iam_role" "pipeline_role" {
   name = "codepipeline-role"
@@ -147,36 +148,41 @@ resource "aws_codepipeline" "pipeline" {
   }
 
   stage {
-  name = "Source"
+    name = "Source"
+    
+    action {
+      name             = "Source"
+      category         = "Source"
+      owner            = "ThirdParty"
+      provider         = "GitHub"
+      version          = "1"
+      output_artifacts = ["source_output"]
 
-  action {
-    name             = "Source"
-    category         = "Source"
-    owner            = "ThirdParty"
-    provider         = "GitHub"
-    version          = "1"
-    output_artifacts = ["source_output"]
-
-    configuration = {
-      Owner      = "your-github-username"
-      Repo       = "your-infra-repo-name"
-      Branch     = "main"
-      OAuthToken = "" # leave empty if public, or pass dummy var
+      configuration = {
+        Owner      = var.github_owner
+        Repo       = var.github_repo_name
+        Branch     = var.github_branch
+      }
     }
   }
-}
-
 
   stage {
     name = "Deploy"
+    
     action {
       name             = "DeployAction"
       category         = "Build"
       owner            = "AWS"
       provider         = "CodeBuild"
       input_artifacts  = ["source_output"]
-      project_name     = aws_codebuild_project.deploy.name
-      version          = "1"
+      output_artifacts = ["deploy_output"]
+      run_order        = 1
+
+      configuration = {
+        ProjectName = aws_codebuild_project.deploy.name
+      }
     }
   }
 }
+
+
