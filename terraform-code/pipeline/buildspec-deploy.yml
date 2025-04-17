@@ -4,6 +4,9 @@ env:
   variables:
     GITHUB_REPO_URL: https://github.com/sudhakarbastawade2303/code-pipeline-project.git
     GITHUB_BRANCH: master
+    KUBE_CONFIG: /root/.kube/config
+    EKS_CLUSTER_NAME: your-cluster-name
+    AWS_REGION: your-region
 
 phases:
   install:
@@ -27,8 +30,8 @@ phases:
 
   build:
     commands:
-    - echo "Deploying Sock Shop microservices"
-    - kubectl apply -f complete-deploy.yml
+    - echo "Deploying YAML file to Kubernetes"
+    - kubectl apply -f terraform-code/complete-deploy.yml
     - echo "Waiting for front-end rollout..."
     - kubectl rollout status deployment/front-end -n sock-shop --timeout=180s
 

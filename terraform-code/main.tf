@@ -122,6 +122,11 @@ resource "aws_codebuild_project" "deploy" {
       name  = "EKS_CLUSTER_NAME"
       value = var.cluster_name
     }
+
+    environment_variable {
+      name  = "SOURCE_FILE_PATH"
+      value = "source_output::terraform-code/complete-deploy.yml"
+    }
   }
 
 }
@@ -157,6 +162,7 @@ resource "aws_codepipeline" "pipeline" {
     type     = "S3"
   }
 
+  # Source stage (no actual work, just a placeholder)
   stage {
     name = "Source"
 
@@ -177,7 +183,7 @@ resource "aws_codepipeline" "pipeline" {
     }
   }
 
-
+  # Deploy stage
   stage {
     name = "Deploy"
 
@@ -187,7 +193,7 @@ resource "aws_codepipeline" "pipeline" {
       owner            = "AWS"
       provider         = "CodeBuild"       # Must be CodeBuild if using CodeBuild project
       input_artifacts  = ["source_output"] # Comes from previous stage
-      output_artifacts = ["deploy_output"]
+      output_artifacts = [] # No output artifact since we're just deploying
       run_order        = 1
       version          = "1"
 
@@ -197,5 +203,7 @@ resource "aws_codepipeline" "pipeline" {
     }
   }
 }
+
+
 
 
