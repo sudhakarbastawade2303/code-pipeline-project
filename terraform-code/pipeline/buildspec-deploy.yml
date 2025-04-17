@@ -1,0 +1,42 @@
+version: 0.2
+
+env:
+  variables:
+    GITHUB_REPO_URL: https://github.com/microservices-demo/microservices-demo.git
+    GITHUB_BRANCH: master
+
+phases:
+  install:
+    runtime-versions:
+      docker: 20
+    commands:
+    - echo "Installing tools..."
+    - curl -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.27.4/2023-09-14/bin/linux/amd64/kubectl
+    - chmod +x ./kubectl
+    - mv ./kubectl /usr/local/bin/
+    - pip install --upgrade awscli
+    - yum install -y git
+
+  pre_build:
+    commands:
+    - echo "Setting up kubeconfig"
+    - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+    - echo "Cloning public repo: $GITHUB_REPO_URL"
+    - git clone -b $GITHUB_BRANCH $GITHUB_REPO_URL
+    - cd microservices-demo
+
+  build:
+    commands:
+    - echo "Deploying Sock Shop microservices"
+    - kubectl apply -f deploy/kubernetes/complete-demo.yaml
+    - echo "Waiting for front-end rollout..."
+    - kubectl rollout status deployment/front-end -n sock-shop --timeout=180s
+
+  post_build:
+    commands:
+    - echo "Deployment done. Listing services:"
+    - kubectl get svc -n sock-shop
+    - kubectl get pods -n sock-shop
+
+artifacts:
+  files: []
